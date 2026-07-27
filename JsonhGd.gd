@@ -3,23 +3,30 @@ class_name JsonhGd extends Object
 class JsonhResultEnumerable extends RefCounted:
 	var reader: JsonhReader
 	var items: Array[JsonhResultEnumerableItem]
-	
+	var end_string_index: int
+
 	func _init(_reader: JsonhReader) -> void:
 		reader = _reader
 		items = []
-	
+		end_string_index = -1
+
 	func append(index: int, result: JsonhResult) -> void:
 		items.append(JsonhResultEnumerableItem.new(index, result))
-	
+
+	func finish(_end_string_index: int) -> JsonhResultEnumerable:
+		end_string_index = _end_string_index
+		return self
+
 	func to_array() -> Array[JsonhResult]:
 		var array: Array[JsonhResult] = []
 		for enumerable_item: JsonhResultEnumerableItem in items:
 			array.append(enumerable_item.result)
 		return array
-	
+
 	func _iter_init(iter: Array) -> bool:
 		iter[0] = 0
 		if iter[0] >= len(items):
+			reader.string_index = end_string_index
 			return false
 		var current_item: JsonhResultEnumerableItem = items[iter[0]]
 		reader.string_index = current_item.string_index
@@ -28,6 +35,7 @@ class JsonhResultEnumerable extends RefCounted:
 	func _iter_next(iter: Array) -> bool:
 		iter[0] += 1
 		if iter[0] >= len(items):
+			reader.string_index = end_string_index
 			return false
 		var current_item: JsonhResultEnumerableItem = items[iter[0]]
 		reader.string_index = current_item.string_index
@@ -695,66 +703,67 @@ class JsonhReader extends RefCounted:
 	## Reads comments and whitespace and errors if the reader contains another element.
 	func read_end_of_elements() -> JsonhResultEnumerable:
 		var enumerable := JsonhResultEnumerable.new(self)
-		
+
 		# Comments & whitespace
 		for token_item: JsonhResultEnumerableItem in _read_comments_and_whitespace():
 			if token_item.result.is_error:
 				enumerable.append(string_index, JsonhResult.from_error(token_item.result.error()))
-				return enumerable
+				return enumerable.finish(string_index)
 			enumerable.append(string_index, token_item.result)
-		
+
 		# Peek char
 		if _peek() != null:
 			enumerable.append(string_index, JsonhResult.from_error("Expected end of elements"))
-		
-		return enumerable
+
+		return enumerable.finish(string_index)
 
 	## Reads a single element from the reader.
 	func read_element() -> JsonhResultEnumerable:
 		var enumerable := JsonhResultEnumerable.new(self)
-		
+
 		# Comments & whitespace
 		for token_item: JsonhResultEnumerableItem in _read_comments_and_whitespace():
 			if token_item.result.is_error:
 				enumerable.append(string_index, JsonhResult.from_error(token_item.result.error()))
-				return enumerable
+				return enumerable.finish(string_index)
 			enumerable.append(string_index, token_item.result)
+		print(string.substr(string_index).json_escape())
 
 		# Peek char
 		var next: Variant = _peek()
 		if next == null:
 			enumerable.append(string_index, JsonhResult.from_error("Expected token, got end of input"))
-			return enumerable
+			return enumerable.finish(string_index)
 
 		# Object
 		if next == '{':
 			for token_item: JsonhResultEnumerableItem in _read_object():
 				if token_item.result.is_error:
 					enumerable.append(string_index, JsonhResult.from_error(token_item.result.error()))
-					return enumerable
+					return enumerable.finish(string_index)
 				enumerable.append(string_index, token_item.result)
 		# Array
 		elif next == '[':
 			for token_item: JsonhResultEnumerableItem in _read_array():
 				if token_item.result.is_error:
 					enumerable.append(string_index, JsonhResult.from_error(token_item.result.error()))
-					return enumerable
+					return enumerable.finish(string_index)
 				enumerable.append(string_index, token_item.result)
 		# Primitive value (null, true, false, string, number)
 		else:
 			var token: JsonhResult = _read_primitive_element()
 			if token.is_error:
 				enumerable.append(string_index, JsonhResult.from_error(token.error()))
-				return enumerable
+				return enumerable.finish(string_index)
 
 			# Detect braceless object from property name
 			for token2_item: JsonhResultEnumerableItem in _read_braceless_object_or_end_of_primitive(token.value() as JsonhToken):
 				if token2_item.result.is_error:
 					enumerable.append(string_index, token2_item.result)
-					return enumerable
+					return enumerable.finish(string_index)
 				enumerable.append(string_index, token2_item.result)
 		
-		return enumerable
+		return enumerable.finish(string_index)
 
 	func _read_object() -> JsonhResultEnumerable:
 		var enumerable := JsonhResultEnumerable.new(self)
@@ -765,7 +774,7 @@ class JsonhReader extends RefCounted:
 			for token_item: JsonhResultEnumerableItem in _read_braceless_object():
 				if token_item.result.is_error:
 					enumerable.append(string_index, token_item.result)
-					return enumerable
+					return enumerable.finish(string_index)
 				enumerable.append(string_index, token_item.result)
 		# Start of object
 		enumerable.append(string_index, JsonhResult.from_value(JsonhToken.new(JsonTokenType.START_OBJECT)))
@@ -774,14 +783,14 @@ class JsonhReader extends RefCounted:
 		# Check exceeded max depth
 		if depth > options.max_depth:
 			enumerable.append(string_index, JsonhResult.from_error("Exceeded max depth"))
-			return enumerable
+			return enumerable.finish(string_index)
 
 		while true:
 			# Comments & whitespace
 			for token_item: JsonhResultEnumerableItem in _read_comments_and_whitespace():
 				if token_item.result.is_error:
 					enumerable.append(string_index, token_item.result)
-					return enumerable
+					return enumerable.finish(string_index)
 				enumerable.append(string_index, token_item.result)
 
 			var next: Variant = _peek()
@@ -790,10 +799,10 @@ class JsonhReader extends RefCounted:
 				if options.incomplete_inputs:
 					depth -= 1
 					enumerable.append(string_index, JsonhResult.from_value(JsonhToken.new(JsonTokenType.END_OBJECT)))
-					return enumerable
+					return enumerable.finish(string_index)
 				# Missing closing brace
 				enumerable.append(string_index, JsonhResult.from_error("Expected `}` to end object, got end of input"))
-				return enumerable
+				return enumerable.finish(string_index)
 
 			# Closing brace
 			if next == '}':
@@ -801,16 +810,16 @@ class JsonhReader extends RefCounted:
 				_read()
 				depth -= 1
 				enumerable.append(string_index, JsonhResult.from_value(JsonhToken.new(JsonTokenType.END_OBJECT)))
-				return enumerable
+				return enumerable.finish(string_index)
 			# Property
 			else:
 				for token_item: JsonhResultEnumerableItem in _read_property():
 					if token_item.result.is_error:
 						enumerable.append(string_index, token_item.result)
-						return enumerable
+						return enumerable.finish(string_index)
 					enumerable.append(string_index, token_item.result)
 		
-		return enumerable
+		return enumerable.finish(string_index)
 
 	func _read_braceless_object(property_name_tokens: Variant = null) -> JsonhResultEnumerable:
 		var enumerable := JsonhResultEnumerable.new(self)
@@ -822,52 +831,52 @@ class JsonhReader extends RefCounted:
 		# Check exceeded max depth
 		if depth > options.max_depth:
 			enumerable.append(string_index, JsonhResult.from_error("Exceeded max depth"))
-			return enumerable
+			return enumerable.finish(string_index)
 
 		# Initial tokens
 		if property_name_tokens != null:
 			for initial_token_item: JsonhResultEnumerableItem in _read_property(property_name_tokens):
 				if initial_token_item.result.is_error:
 					enumerable.append(string_index, initial_token_item.result)
-					return enumerable
+					return enumerable.finish(string_index)
 				enumerable.append(string_index, initial_token_item.result)
-		
+
 		while true:
 			# Comments & whitespace
 			for token_item: JsonhResultEnumerableItem in _read_comments_and_whitespace():
 				if token_item.result.is_error:
 					enumerable.append(string_index, token_item.result)
-					return enumerable
+					return enumerable.finish(string_index)
 				enumerable.append(string_index, token_item.result)
-			
+
 			if _peek() == null:
 				# End of braceless object
 				depth -= 1
 				enumerable.append(string_index, JsonhResult.from_value(JsonhToken.new(JsonTokenType.END_OBJECT)))
-				return enumerable
-			
+				return enumerable.finish(string_index)
+
 			# Property
 			for token_item: JsonhResultEnumerableItem in _read_property():
 				if token_item.result.is_error:
 					enumerable.append(string_index, token_item.result)
-					return enumerable
+					return enumerable.finish(string_index)
 				enumerable.append(string_index, token_item.result)
 		
-		return enumerable
+		return enumerable.finish(string_index)
 
 	func _read_braceless_object_or_end_of_primitive(primitive_token: JsonhToken) -> JsonhResultEnumerable:
 		var enumerable := JsonhResultEnumerable.new(self)
-		
+
 		# Comments & whitespace
 		var property_name_tokens: Variant = null
 		for comment_or_whitespace_token_item: JsonhResultEnumerableItem in _read_comments_and_whitespace():
 			if comment_or_whitespace_token_item.result.is_error:
 				enumerable.append(string_index, comment_or_whitespace_token_item.result)
-				return enumerable
+				return enumerable.finish(string_index)
 			if property_name_tokens == null:
 				property_name_tokens = []
 			(property_name_tokens as Array).append(comment_or_whitespace_token_item.result.value())
-		
+
 		# Primitive
 		if not _read_one(':'):
 			# Primitive
@@ -877,7 +886,7 @@ class JsonhReader extends RefCounted:
 				for comment_or_whitespace_token: JsonhToken in property_name_tokens:
 					enumerable.append(string_index, JsonhResult.from_value(comment_or_whitespace_token))
 			# End of primitive
-			return enumerable
+			return enumerable.finish(string_index)
 
 		# Property name
 		if property_name_tokens == null:
@@ -888,10 +897,10 @@ class JsonhReader extends RefCounted:
 		for object_token_item: JsonhResultEnumerableItem in _read_braceless_object(property_name_tokens):
 			if object_token_item.result.is_error:
 				enumerable.append(string_index, object_token_item.result)
-				return enumerable
+				return enumerable.finish(string_index)
 			enumerable.append(string_index, object_token_item.result)
 		
-		return enumerable
+		return enumerable.finish(string_index)
 
 	func _read_property(property_name_tokens: Variant = null) -> JsonhResultEnumerable:
 		var enumerable := JsonhResultEnumerable.new(self)
@@ -903,34 +912,34 @@ class JsonhReader extends RefCounted:
 			for token_item: JsonhResultEnumerableItem in _read_property_name():
 				if token_item.result.is_error:
 					enumerable.append(string_index, token_item.result)
-					return enumerable
+					return enumerable.finish(string_index)
 				enumerable.append(string_index, token_item.result)
 
 		# Comments & whitespace
 		for token_item: JsonhResultEnumerableItem in _read_comments_and_whitespace():
 			if token_item.result.is_error:
 				enumerable.append(string_index, token_item.result)
-				return enumerable
+				return enumerable.finish(string_index)
 			enumerable.append(string_index, token_item.result)
 		
 		# Property value
 		for token_item: JsonhResultEnumerableItem in read_element():
 			if token_item.result.is_error:
 				enumerable.append(string_index, token_item.result)
-				return enumerable
+				return enumerable.finish(string_index)
 			enumerable.append(string_index, token_item.result)
 
 		# Comments & whitespace
 		for token_item: JsonhResultEnumerableItem in _read_comments_and_whitespace():
 			if token_item.result.is_error:
 				enumerable.append(string_index, token_item.result)
-				return enumerable
+				return enumerable.finish(string_index)
 			enumerable.append(string_index, token_item.result)
 
 		# Optional comma
 		_read_one(',')
 		
-		return enumerable
+		return enumerable.finish(string_index)
 
 	func _read_property_name() -> JsonhResultEnumerable:
 		var enumerable := JsonhResultEnumerable.new(self)
@@ -939,24 +948,24 @@ class JsonhReader extends RefCounted:
 		var string_token: JsonhResult = _read_string()
 		if string_token.is_error:
 			enumerable.append(string_index, string_token)
-			return enumerable
+			return enumerable.finish(string_index)
 		
 		# Comments & whitespace
 		for token_item: JsonhResultEnumerableItem in _read_comments_and_whitespace():
 			if token_item.result.is_error:
 				enumerable.append(string_index, token_item.result)
-				return enumerable
+				return enumerable.finish(string_index)
 			enumerable.append(string_index, token_item.result)
 
 		# Colon
 		if not _read_one(':'):
 			enumerable.append(string_index, JsonhResult.from_error("Expected `:` after property name in object"))
-			return enumerable
+			return enumerable.finish(string_index)
 
 		# End of property name
 		enumerable.append(string_index, JsonhResult.from_value(JsonhToken.new(JsonTokenType.PROPERTY_NAME, (string_token.value() as JsonhToken).value)))
 		
-		return enumerable
+		return enumerable.finish(string_index)
 
 	func _read_array() -> JsonhResultEnumerable:
 		var enumerable := JsonhResultEnumerable.new(self)
@@ -964,7 +973,7 @@ class JsonhReader extends RefCounted:
 		# Opening bracket
 		if not _read_one('['):
 			enumerable.append(string_index, JsonhResult.from_error("Expected `[` to start array"))
-			return enumerable
+			return enumerable.finish(string_index)
 		# Start of array
 		enumerable.append(string_index, JsonhResult.from_value(JsonhToken.new(JsonTokenType.START_ARRAY)))
 		depth += 1
@@ -972,14 +981,14 @@ class JsonhReader extends RefCounted:
 		# Check exceeded max depth
 		if depth > options.max_depth:
 			enumerable.append(string_index, JsonhResult.from_error("Exceeded max depth"))
-			return enumerable
+			return enumerable.finish(string_index)
 
 		while true:
 			# Comments & whitespace
 			for token_item: JsonhResultEnumerableItem in _read_comments_and_whitespace():
 				if token_item.result.is_error:
 					enumerable.append(string_index, token_item.result)
-					return enumerable
+					return enumerable.finish(string_index)
 				enumerable.append(string_index, token_item.result)
 
 			var next: Variant = _peek()
@@ -988,27 +997,27 @@ class JsonhReader extends RefCounted:
 				if options.incomplete_inputs:
 					depth -= 1
 					enumerable.append(string_index, JsonhResult.from_value(JsonhToken.new(JsonTokenType.END_ARRAY)))
-					return enumerable
+					return enumerable.finish(string_index)
 				# Missing closing bracket
 				enumerable.append(string_index, JsonhResult.from_error("Expected `]` to end array, got end of input"))
-				return enumerable
-			
+				return enumerable.finish(string_index)
+
 			# Closing bracket
 			if next == ']':
 				# End of array
 				_read()
 				depth -= 1
 				enumerable.append(string_index, JsonhResult.from_value(JsonhToken.new(JsonTokenType.END_ARRAY)))
-				return enumerable
+				return enumerable.finish(string_index)
 			# Item
 			else:
 				for token_item: JsonhResultEnumerableItem in _read_item():
 					if token_item.result.is_error:
 						enumerable.append(string_index, token_item.result)
-						return enumerable
+						return enumerable.finish(string_index)
 					enumerable.append(string_index, token_item.result)
 		
-		return enumerable
+		return enumerable.finish(string_index)
 
 	func _read_item() -> JsonhResultEnumerable:
 		var enumerable := JsonhResultEnumerable.new(self)
@@ -1017,20 +1026,20 @@ class JsonhReader extends RefCounted:
 		for token_item: JsonhResultEnumerableItem in read_element():
 			if token_item.result.is_error:
 				enumerable.append(string_index, token_item.result)
-				return enumerable
+				return enumerable.finish(string_index)
 			enumerable.append(string_index, token_item.result)
 
 		# Comments & whitespace
 		for token_item: JsonhResultEnumerableItem in _read_comments_and_whitespace():
 			if token_item.result.is_error:
 				enumerable.append(string_index, token_item.result)
-				return enumerable
+				return enumerable.finish(string_index)
 			enumerable.append(string_index, token_item.result)
 
 		# Optional comma
 		_read_one(',')
 		
-		return enumerable
+		return enumerable.finish(string_index)
 
 	func _read_string() -> JsonhResult:
 		# Verbatim
@@ -1474,21 +1483,21 @@ class JsonhReader extends RefCounted:
 			# Peek char
 			var next: Variant = _peek()
 			if next == null:
-				return enumerable
+				return enumerable.finish(string_index)
 
 			# Comment
 			if next in ['#', '/']:
 				var comment: JsonhResult = _read_comment()
 				if comment.is_error:
 					enumerable.append(string_index, comment)
-					return enumerable
+					return enumerable.finish(string_index)
 				enumerable.append(string_index, comment)
 			# End of comments
 			else:
-				return enumerable
+				return enumerable.finish(string_index)
 		
 		push_error("Unreachable code reached")
-		return enumerable
+		return enumerable.finish(string_index)
 
 	func _read_comment() -> JsonhResult:
 		var block_comment: bool = false
