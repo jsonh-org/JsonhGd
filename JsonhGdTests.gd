@@ -126,7 +126,7 @@ static func BracelessObjectTest() -> void:
 a: b
 c : d
 """
-	var element: Dictionary[String, String] = JsonhGd.JsonhReader.parse_element_from_string(jsonh).value()
+	var element: Dictionary[String, Variant] = JsonhGd.JsonhReader.parse_element_from_string(jsonh).value()
 
 	assert(len(element) == 2)
 	assert(element["a"] == "b")
@@ -140,7 +140,7 @@ static func CommentTest() -> void:
 	    3 /* block comment */, 4
 ]
 """
-	var element: Array[int] = JsonhGd.JsonhReader.parse_element_from_string(jsonh).value()
+	var element: Array = JsonhGd.JsonhReader.parse_element_from_string(jsonh).value()
 
 	assert(len(element) == 4)
 	assert(element[0] == 1)
@@ -156,14 +156,14 @@ static func VerbatimStringTest() -> void:
 	@e\\\\: f\\\\
 }
 """
-	var element: Dictionary[String, String] = JsonhGd.JsonhReader.parse_element_from_string(jsonh).value()
+	var element: Dictionary[String, Variant] = JsonhGd.JsonhReader.parse_element_from_string(jsonh).value()
 
 	assert(len(element) == 3)
 	assert(element["a\\"] == "b\\")
 	assert(element["c\\\\"] == "d\\\\")
 	assert(element["e\\\\"] == "f\\")
 
-	var element2: Dictionary[String, String] = JsonhGd.JsonhReader.parse_element_from_string(jsonh, JsonhGd.JsonhReaderOptions.new(
+	var element2: Dictionary[String, Variant] = JsonhGd.JsonhReader.parse_element_from_string(jsonh, JsonhGd.JsonhReaderOptions.new(
 		JsonhGd.JsonhVersion.V1,
 	)).value()
 	assert(len(element2) == 3)
@@ -174,7 +174,7 @@ static func VerbatimStringTest() -> void:
 	var jsonh2: String = """
 @"a\\\\": @'''b\\\\'''
 """
-	var element3: Dictionary[String, String] = JsonhGd.JsonhReader.parse_element_from_string(jsonh2).value()
+	var element3: Dictionary[String, Variant] = JsonhGd.JsonhReader.parse_element_from_string(jsonh2).value()
 
 	assert(len(element3) == 1)
 	assert(element3["a\\\\"] == "b\\\\")
@@ -224,29 +224,29 @@ static func ParseJsonTest() -> void:
 
 	var reader3: JsonhGd.JsonhReader = JsonhGd.JsonhReader.new(jsonh)
 	assert(reader3.parse_json(false, "  ").value() == '''{
-	"a": "b",
-	"c": "私",
-	"x": [
-		"a",
-		"b",
-		"c"
-	],
-	"y": {},
-	"z": 0.5
+  "a": "b",
+  "c": "私",
+  "x": [
+    "a",
+    "b",
+    "c"
+  ],
+  "y": {},
+  "z": 0.5
 }''')
 
 	var reader4: JsonhGd.JsonhReader = JsonhGd.JsonhReader.new(jsonh)
 	assert(reader4.parse_json(true, "  ").value() == '''{
-	/* Hello / * test * / world*/
-	"a": "b",
-	"c": "私",
-	"x": [
-		"a",
-		"b",
-		"c"
-	],
-	"y": {},
-	"z": 0.5
+  /* Hello / * test * / world*/
+  "a": "b",
+  "c": "私",
+  "x": [
+    "a",
+    "b",
+    "c"
+  ],
+  "y": {},
+  "z": 0.5
 }''')
 
 	var jsonh2: String = '''
@@ -312,7 +312,7 @@ static func QuotelessStringsLeadingTrailingWhitespaceTest() -> void:
 	a b  , 
 ]
 """
-	var element: Array[String] = JsonhGd.JsonhReader.parse_element_from_string(jsonh).value()
+	var element: Array = JsonhGd.JsonhReader.parse_element_from_string(jsonh).value()
 
 	assert(len(element) == 1)
 	assert(element[0] == "a b")
@@ -323,7 +323,7 @@ static func SpaceInQuotelessPropertyNameTest() -> void:
 	a b: c d
 }
 """
-	var element: Dictionary[String, String] = JsonhGd.JsonhReader.parse_element_from_string(jsonh).value()
+	var element: Dictionary[String, Variant] = JsonhGd.JsonhReader.parse_element_from_string(jsonh).value()
 
 	assert(len(element) == 1)
 	assert(element["a b"] == "c d")
@@ -334,7 +334,7 @@ a: \\"5
 b: \\\\z
 c: 5 \\\\
 """
-	var element: Dictionary[String, String] = JsonhGd.JsonhReader.parse_element_from_string(jsonh).value()
+	var element: Dictionary[String, Variant] = JsonhGd.JsonhReader.parse_element_from_string(jsonh).value()
 
 	assert(len(element) == 3)
 	assert(element["a"] == "\"5")
@@ -425,11 +425,11 @@ static func DuplicatePropertyNameTest() -> void:
 	a: 3,
 }
 """
-	var element: Dictionary[String, int] = JsonhGd.JsonhReader.parse_element_from_string(jsonh).value()
+	var element: Dictionary[String, Variant] = JsonhGd.JsonhReader.parse_element_from_string(jsonh).value()
 
 	assert(element == {
-		"c": 2,
-		"a": 3,
+		"c": float(2),
+		"a": float(3),
 	})
 
 static func EmptyNumberTest() -> void:
@@ -445,21 +445,21 @@ static func LeadingZeroWithExponentTest() -> void:
 	var jsonh: String = """
 [0e4, 0xe, 0xEe+2]
 """
-	var element: Array[int] = JsonhGd.JsonhReader.parse_element_from_string(jsonh).value()
+	var element: Array = JsonhGd.JsonhReader.parse_element_from_string(jsonh).value()
 
-	assert(element == [0e4, 0xe, 1400])
+	assert(element == [float(0e4), float(0xe), float(1400)])
 
 	var jsonh2: String = """
 [e+2, 0xe+2, 0oe+2, 0be+2]
 """
-	var element2: Array[String] = JsonhGd.JsonhReader.parse_element_from_string(jsonh2).value()
+	var element2: Array = JsonhGd.JsonhReader.parse_element_from_string(jsonh2).value()
 
 	assert(element2 == ["e+2", "0xe+2", "0oe+2", "0be+2"])
 
 	var jsonh3: String = """
 [0x0e+, 0b0e+_1]
 """
-	var element3: Array[String] = JsonhGd.JsonhReader.parse_element_from_string(jsonh3).value()
+	var element3: Array = JsonhGd.JsonhReader.parse_element_from_string(jsonh3).value()
 
 	assert(element3 == ["0x0e+", "0b0e+_1"])
 
@@ -504,7 +504,7 @@ static func BigNumbersTest() -> void:
 	999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999
 ]
 """
-	var element: Array[float] = JsonhGd.JsonhReader.parse_element_from_string(jsonh).value()
+	var element: Array = JsonhGd.JsonhReader.parse_element_from_string(jsonh).value()
 
 	assert(len(element) == 3)
 	assert(element[0] == 3.5)

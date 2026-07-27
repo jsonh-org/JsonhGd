@@ -222,7 +222,7 @@ class JsonhNumberParser extends Object:
 
 		# Apply sign
 		if number_sign != 1:
-			number.value_or_null *= sign
+			number.value_or_null *= number_sign
 		return number
 
 	## Converts a fractional number with an exponent (e.g. `12.3e4.5`) from the given base (e.g. `01234567`) to a base-10 real.
@@ -479,7 +479,7 @@ class JsonhReader extends RefCounted:
 							return JsonhResult.from_value(element)
 					# String
 					JsonTokenType.STRING:
-						var element: String = token_result_item.result.value().value
+						var element: String = (token_result_item.result.value() as JsonhToken).value
 						if submit_element.call(element):
 							return JsonhResult.from_value(element)
 					# Number
@@ -492,7 +492,7 @@ class JsonhReader extends RefCounted:
 							return JsonhResult.from_value(element)
 					# Start Object
 					JsonTokenType.START_OBJECT:
-						var element: Dictionary = {}
+						var element: Dictionary[String, Variant] = {}
 						start_element.call(element)
 					# Start Array
 					JsonTokenType.START_ARRAY:
@@ -508,7 +508,7 @@ class JsonhReader extends RefCounted:
 							return JsonhResult.from_value(current_elements.ref[-1])
 					# Property Name
 					JsonTokenType.PROPERTY_NAME:
-						current_property_name.ref = token_result_item.result.value().value
+						current_property_name.ref = (token_result_item.result.value() as JsonhToken).value
 					# Comment
 					JsonTokenType.COMMENT:
 						pass
@@ -695,7 +695,7 @@ class JsonhReader extends RefCounted:
 					current_depth -= 1
 				# Property name
 				JsonTokenType.PROPERTY_NAME:
-					if current_depth == 1 and token_result_item.result.value().value == property_name:
+					if current_depth == 1 and (token_result_item.result.value() as JsonhToken).value == property_name:
 						# Path found
 						return true
 
@@ -883,8 +883,8 @@ class JsonhReader extends RefCounted:
 				enumerable.append(string_index, comment_or_whitespace_token_item.result)
 				return enumerable.finish(string_index)
 			if property_name_tokens == null:
-				property_name_tokens = []
-			(property_name_tokens as Array).append(comment_or_whitespace_token_item.result.value())
+				property_name_tokens = [] as Array[JsonhToken]
+			(property_name_tokens as Array[JsonhToken]).append(comment_or_whitespace_token_item.result.value())
 
 		# Primitive
 		if not _read_one(':'):
@@ -900,7 +900,7 @@ class JsonhReader extends RefCounted:
 		# Property name
 		if property_name_tokens == null:
 			property_name_tokens = []
-		(property_name_tokens as Array).append(JsonhToken.new(JsonTokenType.PROPERTY_NAME, primitive_token.value))
+		(property_name_tokens as Array[JsonhToken]).append(JsonhToken.new(JsonTokenType.PROPERTY_NAME, primitive_token.value))
 
 		# Braceless object
 		for object_token_item: JsonhResultEnumerableItem in _read_braceless_object(property_name_tokens):
@@ -915,7 +915,7 @@ class JsonhReader extends RefCounted:
 		var enumerable := JsonhResultEnumerableBuilder.new(self)
 		
 		if property_name_tokens != null:
-			for token: JsonhResult in property_name_tokens:
+			for token: JsonhToken in property_name_tokens:
 				enumerable.append(string_index, JsonhResult.from_value(token))
 		else:
 			for token_item: JsonhResultEnumerableItem in _read_property_name():
@@ -1751,7 +1751,7 @@ class JsonhReader extends RefCounted:
 		while end > start and input[end - 1] in trim_chars:
 			end -= 1
 
-		return input.substr(start, start + end)
+		return input.substr(start, end - start)
 
 	static func _contains_any_except(input: String, allowed: PackedStringArray) -> bool:
 		for input_char: String in input:
