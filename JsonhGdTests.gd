@@ -94,8 +94,8 @@ static func QuotelessEscapeSequenceTest() -> void:
 static func MultiQuotedStringTest() -> void:
 	var jsonh: String = '''
 """"
-Hello! Here's a quote: ". Now a double quote: "". And a triple quote! """. Escape: \\\\\\U0001F47D.
-""""
+  Hello! Here's a quote: ". Now a double quote: "". And a triple quote! """. Escape: \\\\\\U0001F47D.
+ """"
 '''
 	var element: String = JsonhGd.JsonhReader.parse_element_from_string(jsonh).value()
 
