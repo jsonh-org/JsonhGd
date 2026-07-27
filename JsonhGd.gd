@@ -1648,7 +1648,7 @@ class JsonhReader extends RefCounted:
 			'U':
 				return _read_hex_escape_sequence(8, high_surrogate)
 			# Escaped newline
-			_NEWLINE_CHARS:
+			_ when escape_char in _NEWLINE_CHARS:
 				# Join CR LF
 				if escape_char == 'r':
 					_read_one('\n')
