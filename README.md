@@ -45,7 +45,7 @@ JsonhGd is a parser implementation of [JSONH V1 & V2](https://github.com/jsonh-o
 
 ## Usage
 
-Everything you need is contained within `JsonhReader`:
+Everything you need is contained within `JsonhGd.JsonhReader`:
 
 ```gdscript
 extends Node
