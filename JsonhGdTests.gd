@@ -124,7 +124,7 @@ static func ArrayTest() -> void:
 	assert(element[4] == 6)
 
 static func NumberParserTest() -> void:
-	assert(int(JsonhGd.JsonhNumberParser.parse("1.2e3.4").value()) == 3014)
+	assert(int(JsonhGd.JsonhNumberParser.parse("1.2e3.4").value() as float) == 3014)
 
 static func BracelessObjectTest() -> void:
 	var jsonh: String = """
