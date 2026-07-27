@@ -737,7 +737,6 @@ class JsonhReader extends RefCounted:
 				enumerable.append(string_index, JsonhResult.from_error(token_item.result.error()))
 				return enumerable.finish(string_index)
 			enumerable.append(string_index, token_item.result)
-		print(string.substr(string_index).json_escape())
 
 		# Peek char
 		var next: Variant = _peek()

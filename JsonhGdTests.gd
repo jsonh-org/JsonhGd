@@ -47,7 +47,6 @@ static func NestableBlockCommentTest() -> void:
 	var tokens: Array[JsonhGd.JsonhResult] = reader.read_element().to_array()
 
 	for token in tokens:
-		print(token.value())
 		assert(not token.is_error)
 	assert(tokens[0].value().json_type == JsonhGd.JsonTokenType.COMMENT)
 	assert(tokens[0].value().value == " ")
