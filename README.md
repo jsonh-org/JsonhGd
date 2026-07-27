@@ -59,3 +59,9 @@ func _ready() -> void:
 	var element: Variant = JsonhGd.JsonhReader.parse_element_from_string(jsonh).value()
 	print(element)
 ```
+
+## Limitations
+
+### No true deferred execution
+
+Since GDScript doesn't have support for "yield return" (generators), deferred execution is emulated using a `JsonhResultEnumerable` type. The type contains the finished results, but moves to the correct indexes in the source string as the enumerable is iterated.
