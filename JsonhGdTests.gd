@@ -2,16 +2,12 @@
 class_name JsonhGdTests extends EditorScript
 
 func _run() -> void:
-	#for method: Dictionary in get_method_list():
-		#var method_name: String = method.name
-		#if method_name.ends_with("Test"):
-			#print(str("Running '", method_name, "'"))
-			#call(method_name)
-	#print("All tests finished")
-	
-	BasicObjectTest()
-	NestableBlockCommentTest()
-	FindPropertyValueTest()
+	for method: Dictionary in get_method_list():
+		var method_name: String = method.name
+		if method_name.ends_with("Test"):
+			print(str("Running '", method_name, "'"))
+			call(method_name)
+	print("All tests finished")
 
 # 
 # Read Tests
