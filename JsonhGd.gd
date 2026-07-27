@@ -435,7 +435,7 @@ class JsonhReader extends RefCounted:
 
 		var start_element := func(element: Variant) -> void:
 			submit_element.call(element)
-			current_elements.ref.append(element)
+			(current_elements.ref as Array).append(element)
 
 		var parse_next_element := func() -> JsonhResult:
 			for token_result_item: JsonhResultEnumerableItem in read_element():
@@ -466,7 +466,7 @@ class JsonhReader extends RefCounted:
 							return JsonhResult.from_value(element)
 					# Number
 					JsonTokenType.NUMBER:
-						var result: JsonhResult = JsonhNumberParser.parse(token_result_item.result.value().value)
+						var result: JsonhResult = JsonhNumberParser.parse((token_result_item.result.value() as JsonhToken).value)
 						if result.is_error:
 							return JsonhResult.from_error(result.error())
 						var element: float = result.value()
@@ -484,7 +484,7 @@ class JsonhReader extends RefCounted:
 					JsonTokenType.END_OBJECT, JsonTokenType.END_ARRAY:
 						# Nested element
 						if len(current_elements.ref) > 1:
-							current_elements.ref.pop_back()
+							(current_elements.ref as Array).pop_back()
 						# Root element
 						else:
 							return JsonhResult.from_value(current_elements.ref[-1])
@@ -589,7 +589,7 @@ class JsonhReader extends RefCounted:
 							return JsonhResult.from_value(result_builder)
 					# Number
 					JsonTokenType.NUMBER:
-						var result: JsonhResult = JsonhNumberParser.parse(token_result_item.result.value().value)
+						var result: JsonhResult = JsonhNumberParser.parse((token_result_item.result.value() as JsonhToken).value)
 						if result.is_error:
 							return JsonhResult.from_error(result.error())
 						result_builder += str(result.value()).trim_suffix(".0")
@@ -748,7 +748,7 @@ class JsonhReader extends RefCounted:
 				return enumerable
 
 			# Detect braceless object from property name
-			for token2_item: JsonhResultEnumerableItem in _read_braceless_object_or_end_of_primitive(token.value()):
+			for token2_item: JsonhResultEnumerableItem in _read_braceless_object_or_end_of_primitive(token.value() as JsonhToken):
 				if token2_item.result.is_error:
 					enumerable.append(string_index, token2_item.result)
 					return enumerable
@@ -866,7 +866,7 @@ class JsonhReader extends RefCounted:
 				return enumerable
 			if property_name_tokens == null:
 				property_name_tokens = []
-			property_name_tokens.append(comment_or_whitespace_token_item.result.value())
+			(property_name_tokens as Array).append(comment_or_whitespace_token_item.result.value())
 		
 		# Primitive
 		if not _read_one(':'):
@@ -882,7 +882,7 @@ class JsonhReader extends RefCounted:
 		# Property name
 		if property_name_tokens == null:
 			property_name_tokens = []
-		property_name_tokens.append(JsonhToken.new(JsonTokenType.PROPERTY_NAME, primitive_token.value))
+		(property_name_tokens as Array).append(JsonhToken.new(JsonTokenType.PROPERTY_NAME, primitive_token.value))
 
 		# Braceless object
 		for object_token_item: JsonhResultEnumerableItem in _read_braceless_object(property_name_tokens):
@@ -954,7 +954,7 @@ class JsonhReader extends RefCounted:
 			return enumerable
 
 		# End of property name
-		enumerable.append(string_index, JsonhResult.from_value(JsonhToken.new(JsonTokenType.PROPERTY_NAME, string_token.value().value)))
+		enumerable.append(string_index, JsonhResult.from_value(JsonhToken.new(JsonTokenType.PROPERTY_NAME, (string_token.value() as JsonhToken).value)))
 		
 		return enumerable
 
@@ -1050,7 +1050,7 @@ class JsonhReader extends RefCounted:
 
 		# Count multiple quotes
 		var start_quote_counter: int = 1
-		while _read_one(start_quote):
+		while _read_one(start_quote as String):
 			start_quote_counter += 1
 
 		# Empty string
@@ -1070,7 +1070,7 @@ class JsonhReader extends RefCounted:
 
 			# Partial end quote was actually part of string
 			if next != start_quote:
-				string_builder += start_quote.repeat(end_quote_counter)
+				string_builder += (start_quote as String).repeat(end_quote_counter)
 				end_quote_counter = 0
 
 			# End quote
@@ -1360,7 +1360,7 @@ class JsonhReader extends RefCounted:
 					return [number4, partial_chars_read4]
 
 		# End of number
-		var number5: JsonhResult = JsonhResult.from_value(JsonhToken.new(JsonTokenType.NUMBER, number_builder.ref))
+		var number5: JsonhResult = JsonhResult.from_value(JsonhToken.new(JsonTokenType.NUMBER, (number_builder.ref as String)))
 		var partial_chars_read5: String = ""
 		return [number5, partial_chars_read5]
 
@@ -1383,7 +1383,7 @@ class JsonhReader extends RefCounted:
 				break
 
 			# Digit
-			if next.to_lower() in base_digits:
+			if (next as String).to_lower() in base_digits:
 				_read()
 				number_builder.ref += next
 				is_empty = false
@@ -1419,11 +1419,11 @@ class JsonhReader extends RefCounted:
 			return JsonhResult.from_error("Empty number")
 
 		# Ensure at least one digit
-		if not _contains_any_except(number_builder.ref, ['.', '-', '+', '_']):
+		if not _contains_any_except((number_builder.ref as String), ['.', '-', '+', '_']):
 			return JsonhResult.from_error("Number must have at least one digit")
 
 		# Trailing underscore
-		if number_builder.ref.ends_with('_'):
+		if (number_builder.ref as String).ends_with('_'):
 			return JsonhResult.from_error("Trailing `_` in number")
 
 		# End of number
@@ -1440,7 +1440,7 @@ class JsonhReader extends RefCounted:
 			var found_quoteless_string: bool = detect_quoteless_string_result[0]
 			var whitespace_chars: String = detect_quoteless_string_result[1]
 			if found_quoteless_string:
-				return _read_quoteless_string(number.value().value + whitespace_chars)
+				return _read_quoteless_string((number.value() as JsonhToken).value + whitespace_chars)
 			# Otherwise, accept number
 			else:
 				return number
@@ -1455,7 +1455,7 @@ class JsonhReader extends RefCounted:
 			return JsonhResult.from_error("Expected primitive element, got end of input")
 
 		# Number
-		if len(next) == 1 and ((ord('0') <= ord(next) and ord(next) <= ord('9')) or (next in ['-', '+', '.'])):
+		if len(next) == 1 and ((ord('0') <= ord(next as String) and ord(next as String) <= ord('9')) or ((next as String) in ['-', '+', '.'])):
 			return _read_number_or_quoteless_string()
 		# String
 		elif (next in ['"', '\'']) or (options.supports_version(JsonhVersion.V2) and next == '@'):
@@ -1664,17 +1664,17 @@ class JsonhReader extends RefCounted:
 
 		# Low surrogate
 		if high_surrogate != null:
-			var combined: JsonhResult = _utf16_surrogates_to_code_point(high_surrogate, code_point.value())
+			var combined: JsonhResult = _utf16_surrogates_to_code_point((high_surrogate as int), (code_point.value() as int))
 			if combined.is_error:
 				return JsonhResult.from_error(combined.error())
-			return JsonhResult.from_value(char(combined.value()))
+			return JsonhResult.from_value(char(combined.value() as int))
 		else:
 			# High surrogate followed by low surrogate
-			if _is_utf16_high_surrogate(code_point.value()) and _read_one('\\'):
+			if _is_utf16_high_surrogate(code_point.value() as int) and _read_one('\\'):
 				return _read_escape_sequence(code_point.value())
 			# Standalone character
 			else:
-				return JsonhResult.from_value(char(code_point.value()))
+				return JsonhResult.from_value(char(code_point.value() as int))
 
 	static func _utf16_surrogates_to_code_point(high_surrogate: int, low_surrogate: int) -> JsonhResult:
 		if not JsonhReader._is_utf16_high_surrogate(high_surrogate):
