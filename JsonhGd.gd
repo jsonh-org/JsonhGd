@@ -5,17 +5,10 @@ class JsonhResultEnumerable extends RefCounted:
 	var items: Array[JsonhResultEnumerableItem]
 	var end_string_index: int
 
-	func _init(_reader: JsonhReader) -> void:
+	func _init(_reader: JsonhReader, _items: Array[JsonhResultEnumerableItem], _end_string_index: int) -> void:
 		reader = _reader
-		items = []
-		end_string_index = -1
-
-	func append(index: int, result: JsonhResult) -> void:
-		items.append(JsonhResultEnumerableItem.new(index, result))
-
-	func finish(_end_string_index: int) -> JsonhResultEnumerable:
+		items = _items
 		end_string_index = _end_string_index
-		return self
 
 	func to_array() -> Array[JsonhResult]:
 		var array: Array[JsonhResult] = []
@@ -46,6 +39,23 @@ class JsonhResultEnumerable extends RefCounted:
 
 	func _to_string() -> String:
 		return str("enumerable (", items, ")")
+
+class JsonhResultEnumerableBuilder extends RefCounted:
+	var reader: JsonhReader
+	var items: Array[JsonhResultEnumerableItem]
+
+	func _init(_reader: JsonhReader) -> void:
+		reader = _reader
+		items = []
+
+	func append(index: int, result: JsonhResult) -> void:
+		items.append(JsonhResultEnumerableItem.new(index, result))
+
+	func finish(end_string_index: int) -> JsonhResultEnumerable:
+		return JsonhResultEnumerable.new(reader, items, end_string_index)
+
+	func _to_string() -> String:
+		return str("enumerable builder (", items, ")")
 
 class JsonhResultEnumerableItem extends RefCounted:
 	var string_index: int
@@ -702,7 +712,7 @@ class JsonhReader extends RefCounted:
 
 	## Reads comments and whitespace and errors if the reader contains another element.
 	func read_end_of_elements() -> JsonhResultEnumerable:
-		var enumerable := JsonhResultEnumerable.new(self)
+		var enumerable := JsonhResultEnumerableBuilder.new(self)
 
 		# Comments & whitespace
 		for token_item: JsonhResultEnumerableItem in _read_comments_and_whitespace():
@@ -719,7 +729,7 @@ class JsonhReader extends RefCounted:
 
 	## Reads a single element from the reader.
 	func read_element() -> JsonhResultEnumerable:
-		var enumerable := JsonhResultEnumerable.new(self)
+		var enumerable := JsonhResultEnumerableBuilder.new(self)
 
 		# Comments & whitespace
 		for token_item: JsonhResultEnumerableItem in _read_comments_and_whitespace():
@@ -766,7 +776,7 @@ class JsonhReader extends RefCounted:
 		return enumerable.finish(string_index)
 
 	func _read_object() -> JsonhResultEnumerable:
-		var enumerable := JsonhResultEnumerable.new(self)
+		var enumerable := JsonhResultEnumerableBuilder.new(self)
 		
 		# Opening brace
 		if not _read_one('{'):
@@ -822,7 +832,7 @@ class JsonhReader extends RefCounted:
 		return enumerable.finish(string_index)
 
 	func _read_braceless_object(property_name_tokens: Variant = null) -> JsonhResultEnumerable:
-		var enumerable := JsonhResultEnumerable.new(self)
+		var enumerable := JsonhResultEnumerableBuilder.new(self)
 		
 		# Start of object
 		enumerable.append(string_index, JsonhResult.from_value(JsonhToken.new(JsonTokenType.START_OBJECT)))
@@ -865,7 +875,7 @@ class JsonhReader extends RefCounted:
 		return enumerable.finish(string_index)
 
 	func _read_braceless_object_or_end_of_primitive(primitive_token: JsonhToken) -> JsonhResultEnumerable:
-		var enumerable := JsonhResultEnumerable.new(self)
+		var enumerable := JsonhResultEnumerableBuilder.new(self)
 
 		# Comments & whitespace
 		var property_name_tokens: Variant = null
@@ -903,7 +913,7 @@ class JsonhReader extends RefCounted:
 		return enumerable.finish(string_index)
 
 	func _read_property(property_name_tokens: Variant = null) -> JsonhResultEnumerable:
-		var enumerable := JsonhResultEnumerable.new(self)
+		var enumerable := JsonhResultEnumerableBuilder.new(self)
 		
 		if property_name_tokens != null:
 			for token: JsonhResult in property_name_tokens:
@@ -942,7 +952,7 @@ class JsonhReader extends RefCounted:
 		return enumerable.finish(string_index)
 
 	func _read_property_name() -> JsonhResultEnumerable:
-		var enumerable := JsonhResultEnumerable.new(self)
+		var enumerable := JsonhResultEnumerableBuilder.new(self)
 		
 		# String
 		var string_token: JsonhResult = _read_string()
@@ -968,7 +978,7 @@ class JsonhReader extends RefCounted:
 		return enumerable.finish(string_index)
 
 	func _read_array() -> JsonhResultEnumerable:
-		var enumerable := JsonhResultEnumerable.new(self)
+		var enumerable := JsonhResultEnumerableBuilder.new(self)
 		
 		# Opening bracket
 		if not _read_one('['):
@@ -1020,7 +1030,7 @@ class JsonhReader extends RefCounted:
 		return enumerable.finish(string_index)
 
 	func _read_item() -> JsonhResultEnumerable:
-		var enumerable := JsonhResultEnumerable.new(self)
+		var enumerable := JsonhResultEnumerableBuilder.new(self)
 		
 		# Element
 		for token_item: JsonhResultEnumerableItem in read_element():
@@ -1474,7 +1484,7 @@ class JsonhReader extends RefCounted:
 			return _read_quoteless_string()
 
 	func _read_comments_and_whitespace() -> JsonhResultEnumerable:
-		var enumerable := JsonhResultEnumerable.new(self)
+		var enumerable := JsonhResultEnumerableBuilder.new(self)
 		
 		while true:
 			# Whitespace
