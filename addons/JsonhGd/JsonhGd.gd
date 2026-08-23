@@ -703,6 +703,7 @@ class JsonhReader extends RefCounted:
 		return false
 
 	## Reads whitespace and returns whether the reader contains another token.
+	## Note: This can be used to skip whitespace without skipping comments.
 	func has_token() -> bool:
 		# Whitespace
 		_read_whitespace()
